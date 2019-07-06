@@ -24,31 +24,12 @@ class MPFSharedMemory(object):
     MPF_INT64 = ctypes.c_int64
 
     def __init__(self, size, dtype=MPF_FLOAT32):
-        self._dtype = dtype
+        self.dtype = dtype
         self._size = size
         self._manager = None
-        self._memory = None
-        self._allocate()
+        self.memory = None
         self._log = logging.getLogger("MPFLogger")
-
-    def set(self, index, data):
-        """
-        Function for writing to a segment of the shared memory.
-        :param index: Index at which to begin writing.
-        :param data: Data to write.
-        :return: None.
-        """
-        self._memory.set(index, data)
-
-    def get(self, index, size):
-        """
-        Function for reading out of the shared memory.
-        :param index: Index at which to start reading.
-        :param size: Index at which to stop reading.
-        :return: The data in memory from index to index+size.
-        """
-
-        return self._memory.get(index, size)
+        self._allocate()
 
     def _allocate(self):
         """
@@ -58,15 +39,15 @@ class MPFSharedMemory(object):
         :return: None.
         """
 
-        self._log.debug("Allocating MPFMemoryBlock!\nSize: {}\nData type: {}.".format(self._size, self._dtype))
+        self._log.debug("Allocating MPFMemoryBlock!\nSize: {}\nData type: {}.".format(self._size, self.dtype))
 
         #Register our shared memory block and start the manager object.
-        BaseManager.register('MPF_Memory_Block', MPFSharedMemoryBlock)
+        BaseManager.register('MPFSharedMemoryBlock', MPFSharedMemoryBlock)
         self._manager = BaseManager()
         self._manager.start()
 
         #Build our memory object through the manager object.
-        self._memory = self._manager.MPFSharedMemoryBlock(self._size, self._dtype)
+        self.memory = self._manager.MPFSharedMemoryBlock(self._size, self.dtype)
         self._log.debug("MPFMemoryBlock allocated successfully!")
 
 
@@ -74,7 +55,7 @@ class MPFSharedMemory(object):
         try:
             self._log.debug("Cleaning up MPFMemoryBlock...")
 
-            self._memory.cleanup()
+            self.memory.cleanup()
             self._log.debug("Shutting down MPFMemory manager...")
 
             self._manager.shutdown()
@@ -84,7 +65,7 @@ class MPFSharedMemory(object):
             self._log.debug("MPFMemoryBlock was unable to close!"
                             "\nException type: {}\nException args:".format(type(e), e.args))
         finally:
-            del self._memory
+            del self.memory
             del self._manager
 
 class MPFSharedMemoryBlock(object):
@@ -116,6 +97,9 @@ class MPFSharedMemoryBlock(object):
 
         data = np.frombuffer(self._mem[index:index + size])
         return data
+
+    def get_size(self):
+        return self._mem_size
 
     def _parse_dtype(self, code):
         """
