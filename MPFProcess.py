@@ -16,6 +16,7 @@ class MPFProcess(Process):
         self._out = None
         self._inp = None
         self._loop_wait_period = loop_wait_period
+        self._shared_memory = None
         self.task_checker = None
         self.results_publisher = None
         self._log = None
@@ -89,6 +90,9 @@ class MPFProcess(Process):
 
             self._log.debug("MPFProcess {} Exiting!".format(self.pid))
             return
+
+    def set_shared_memory(self, memory):
+        self._shared_memory = memory
 
     def init(self):
         raise NotImplementedError

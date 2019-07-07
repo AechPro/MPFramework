@@ -31,7 +31,7 @@ class MPFProcessHandler(object):
         if inputQueue is None:
             self._input_queue = mp.Queue(maxsize = input_queue_max_size)
 
-    def setup_process(self, process, cpu_num = None):
+    def setup_process(self, process, shared_memory = None, cpu_num = None):
         """
         This function spawns a process on a desired CPU core if one is provided. It expects an instance of
         MPFProcess to be passed as the process argument.
@@ -49,6 +49,7 @@ class MPFProcessHandler(object):
         #Setup process i/o and start it.
         process._inp = self._input_queue
         process._out = self._output_queue
+        process.set_shared_memory(shared_memory)
         process.start()
 
         #If a specific cpu core is requested and the os is linux, move the process to that core.
@@ -162,10 +163,12 @@ class MPFProcessHandler(object):
             self._log.debug("Removed {} residual outputs from queue.".format(len(residual_output)))
             del residual_output
 
+        #Note here that we do not join either the input or output queues.
+        #A process handler should only have a single process, so if the user has passed
+        #a joinable queue to this handler's process, they are responsible for closing it.
         del self._input_queue
         del self._output_queue
         del self._process
-
 
     def join(self):
         self.close()

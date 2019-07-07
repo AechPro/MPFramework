@@ -1,3 +1,11 @@
+"""
+    File name: ProcessExample.py
+    Author: Matthew Allen
+
+    Description:
+        This file contains an example for how to create a MPFProcess object and interface with it from
+        the main process.
+"""
 from MPFramework import MPFProcess, MPFProcessHandler
 import time
 

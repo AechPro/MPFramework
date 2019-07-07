@@ -16,7 +16,6 @@ import logging
 import ctypes
 
 class MPFSharedMemory(object):
-
     #Supported memory types.
     MPF_FLOAT32 = ctypes.c_float
     MPF_FLOAT64 = ctypes.c_double
@@ -27,9 +26,15 @@ class MPFSharedMemory(object):
         self.dtype = dtype
         self._size = size
         self._manager = None
-        self.memory = None
+        self._memory = None
         self._log = logging.getLogger("MPFLogger")
         self._allocate()
+
+    def fill_memory(self, data):
+        self._memory.set(0, data)
+
+    def get_memory(self):
+        return self._memory
 
     def _allocate(self):
         """
@@ -47,7 +52,7 @@ class MPFSharedMemory(object):
         self._manager.start()
 
         #Build our memory object through the manager object.
-        self.memory = self._manager.MPFSharedMemoryBlock(self._size, self.dtype)
+        self._memory = self._manager.MPFSharedMemoryBlock(self._size, self.dtype)
         self._log.debug("MPFMemoryBlock allocated successfully!")
 
 
@@ -55,7 +60,7 @@ class MPFSharedMemory(object):
         try:
             self._log.debug("Cleaning up MPFMemoryBlock...")
 
-            self.memory.cleanup()
+            self._memory.cleanup()
             self._log.debug("Shutting down MPFMemory manager...")
 
             self._manager.shutdown()
@@ -65,7 +70,7 @@ class MPFSharedMemory(object):
             self._log.debug("MPFMemoryBlock was unable to close!"
                             "\nException type: {}\nException args:".format(type(e), e.args))
         finally:
-            del self.memory
+            del self._memory
             del self._manager
 
 class MPFSharedMemoryBlock(object):
@@ -91,11 +96,11 @@ class MPFSharedMemoryBlock(object):
         """
         Function to read from our memory block.
         :param index: Index at which to start reading.
-        :param size: Index at which to stop reading.
+        :param size: Size of the data to read.
         :return: Memory from index to index+size
         """
 
-        data = np.frombuffer(self._mem[index:index + size])
+        data = self._mem[index:index + size]
         return data
 
     def get_size(self):
@@ -109,6 +114,7 @@ class MPFSharedMemoryBlock(object):
         """
 
         code = code
+
         floatCodes = ('float', 'float32', np.float32, 'f', ctypes.c_float)
         doubleCodes = ('double', 'float64', np.float64, 'd', ctypes.c_double)
         intCodes = ('int', 'int32', np.int32, 'i', ctypes.c_int32)
