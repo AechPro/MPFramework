@@ -7,7 +7,7 @@ This package enables easy spawning and communication between persistent asychnro
 Clone the git. PIP integration is coming soon!
 
 # Usage
-Detailed examples can be found in the Examples folder. The following is a simple example of using a MPFProcess.
+Detailed examples can be found in the Examples folder. The following is a simple example for the usage of a custom MPFProcess.
 ```
 #Extend the MPFProcess base object and implement the necessary functions.
 class ExampleProcess(MPFProcess):
