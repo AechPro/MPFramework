@@ -34,7 +34,7 @@ def main():
     process_handler = MPFProcessHandler()
     process_handler.setup_process(ExampleProcess())
 
-    #Start an infinite loop in the main process.
+    #Start a loop in the main process to show that our example process is running while the main process is busy.
     seconds = 0
     while seconds < 10:
         seconds += 1
