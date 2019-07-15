@@ -4,9 +4,16 @@ A multiprocessing framework for Python 3.4+
 This package enables easy spawning and communication between persistent asychnronous processes in Python.
 
 # Installation
-Clone the git. PIP integration is coming soon!
+Download the git. PIP integration is coming soon!
 
 # Usage
+Once started, a MPFProcess cycles through the following loop:
+1. Call the update function if a new message has been received on the input queue.
+2. Call the step function to perform the main function of the process.
+3. Call the publish function to put any available data on the output queue.
+
+The description of each function is included in the above list as a guideline for what they should do. None of the listed functions have an explicit implementation in the MPFProcess class.
+
 Detailed examples can be found in the Examples folder. The following is a simple example for the usage of a custom MPFProcess.
 ```
 #Extend the MPFProcess base object and implement the necessary functions.
