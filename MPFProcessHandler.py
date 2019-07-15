@@ -27,6 +27,7 @@ class MPFProcessHandler(object):
         self._output_queue = mp.Queue(maxsize = output_queue_max_size)
         self._process = None
         self._log = logging.getLogger("MPFLogger")
+        self._terminating = False
 
         if inputQueue is None:
             self._input_queue = mp.Queue(maxsize = input_queue_max_size)
@@ -54,10 +55,10 @@ class MPFProcessHandler(object):
 
         #If a specific cpu core is requested and the os is linux, move the process to that core.
         if "linux" in sys.platform and cpu_num is not None:
-            self._log.debug("Moving MPFProcess {} to CPU core {}.".format(process.pid, cpu_num))
+            self._log.debug("Moving MPFProcess {} to CPU core {}.".format(process.name, cpu_num))
             os.system("taskset -p -c {} {}".format(cpu_num, process.pid))
 
-        self._log.debug("MPFProcess {} has started!".format(process.pid))
+        self._log.debug("MPFProcess {} has started!".format(process.name))
 
     def put(self, header, data, delay=None, block=False, timeout=None):
         """
@@ -70,13 +71,16 @@ class MPFProcessHandler(object):
         :return: None.
         """
 
+        if self._check_status():
+            return
+
         if not self._input_queue.full():
             #Construct a data packet and put it on the process input queue.
             task = MPFDataPacket(header, data)
             self._input_queue.put(task, block=block, timeout=timeout)
             del task
         else:
-            self._log.debug("MPFProcess {} input queue is full!".format(self._process.pid))
+            self._log.debug("MPFProcess {} input queue is full!".format(self._process.name))
 
         if delay is not None:
             time.sleep(delay)
@@ -90,13 +94,16 @@ class MPFProcessHandler(object):
         :return: Item from our process if there was one, None otherwise.
         """
 
+        if self._check_status():
+            return None
+
         if not self._output_queue.empty():
             data_packet = self._output_queue.get()
             return data_packet()
 
         return None
 
-    def get_all(self, block=False, timeout=None):
+    def get_all(self, block=False, timeout=None, cleaning_up=False):
         """
         Function to get every item currently available on the output queue from our process. The implementation of
         this function looks a bit odd, but it has been my experience that simply checking if a queue is empty almost never
@@ -105,8 +112,12 @@ class MPFProcessHandler(object):
 
         :param block: mp.Queue block argument.
         :param timeout: mp.Queue timeout argument.
+        :param cleaning_up: boolean to indicate that cleanup is happening. Do not modify.
         :return: List of items obtained from our process.
         """
+
+        if self._check_status() and not cleaning_up:
+            return None
 
         #First, check if the queue is empty and return if it is.
         if self._output_queue.empty():
@@ -146,19 +157,20 @@ class MPFProcessHandler(object):
         Function to close and join our process. This should always be called when a process is no longer in use.
         :return: None.
         """
+        self._terminating = True
 
         #Put an exit command on the input queue to our process.
-        self._log.debug("Sending terminate command to process {}.".format(self._process.pid))
-        task = MPFDataPacket(MPFTaskChecker.EXIT_KEYWORDS[0], None)
+        self._log.debug("Sending terminate command to process {}.".format(self._process.name))
+        task = MPFDataPacket(MPFTaskChecker.EXIT_KEYWORDS[0], self._process.name)
         self._input_queue.put(task)
 
         #Terminate and join the process.
-        self._process.terminate()
+        #self._process.terminate()
         self._process.join()
-        self._log.debug("Successfully terminated MPFProcess {}!".format(self._process.pid))
+        self._log.debug("Successfully terminated MPFProcess {}!".format(self._process.name))
 
         #Get any residual items from the output queue and delete them.
-        residual_output = self.get_all()
+        residual_output = self.get_all(cleaning_up=True)
         if residual_output is not None:
             self._log.debug("Removed {} residual outputs from queue.".format(len(residual_output)))
             del residual_output
@@ -166,6 +178,7 @@ class MPFProcessHandler(object):
         #Note here that we do not join either the input or output queues.
         #A process handler should only have a single process, so if the user has passed
         #a joinable queue to this handler's process, they are responsible for closing it.
+
         del self._input_queue
         del self._output_queue
         del self._process
@@ -175,3 +188,17 @@ class MPFProcessHandler(object):
 
     def stop(self):
         self.close()
+
+    def _check_status(self):
+        """
+        Private function to check if our process is still running. If it is not, cleanup the resources.
+        :return:
+        """
+        if self._terminating:
+            return True
+
+        if not self.is_alive():
+            self._log.critical("Detected failure in MPFProcess {}! Terminating...".format(self._process.name))
+            self.close()
+            return True
+        return False

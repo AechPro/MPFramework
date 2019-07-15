@@ -16,13 +16,13 @@ import time
 class MPFTaskChecker(object):
     EXIT_KEYWORDS = ["terminate", "terminal", "exit", "stop", "join", "close", "finish"]
 
-    def __init__(self, input_queue, pid, update_check_sleep_period=0.1, init_sleep_period=1.0):
+    def __init__(self, input_queue, name, update_check_sleep_period=0.1, init_sleep_period=1.0):
         self.latest_data = None
         self.header = None
         self._input_queue = input_queue
         self._update_sleep_period = update_check_sleep_period
         self._init_sleep_period = init_sleep_period
-        self._pid = pid
+        self._name = name
         self._joinable = type(input_queue) == type(JoinableQueue())
         self._log = logging.getLogger("MPFLogger")
 
@@ -34,11 +34,11 @@ class MPFTaskChecker(object):
         :return: None.
         """
 
-        self._log.debug("MPFProcess {} is waiting for initialization...".format(self._pid))
+        self._log.debug("MPFProcess {} is waiting for initialization...".format(self._name))
         #In some cases we might have already received some data by the time this function is called. This checks for that.
         if header is not None and self.header is not None:
             if self.header == header:
-                self._log.debug("MPFProcess {} has initialized!".format(self._pid))
+                self._log.debug("MPFProcess {} has initialized!".format(self._name))
                 return
 
 
@@ -57,7 +57,7 @@ class MPFTaskChecker(object):
             #Wait to avoid CPU stress.
             time.sleep(self._init_sleep_period)
 
-        self._log.debug("MPFProcess {} has initialized!".format(self._pid))
+        self._log.debug("MPFProcess {} has initialized!".format(self._name))
 
     def check_for_update(self):
         """
@@ -73,7 +73,7 @@ class MPFTaskChecker(object):
             #Get the next data packet, should be MPFDataPacket object.
             data_packet = self._input_queue.get_nowait()
             header, data = data_packet()
-            self._log.debug("MPFProcess {} has received a new data packet!".format(self._pid))
+            self._log.debug("MPFProcess {} has received a new data packet!".format(self._name))
 
             #Update our current data object and header.
             self._update_data(data)
@@ -81,7 +81,7 @@ class MPFTaskChecker(object):
             newData = True
 
             #Check to see if the new data was a terminate signal.
-            self._check_for_terminal_header(header)
+            self._check_for_terminal_message(header, data)
 
             #Clean up and delete the received packet.
             data_packet.cleanup()
@@ -106,11 +106,15 @@ class MPFTaskChecker(object):
         finally:
             del self.latest_data
 
-    def _check_for_terminal_header(self, header):
-        h = header.lower().strip()
+    def _check_for_terminal_message(self, header, data):
+        #Check to make sure this message is for us.
+        if data != self._name:
+            return
 
+        #Check to see if this message contains a terminate header.
+        h = header.lower().strip()
         for word in self.EXIT_KEYWORDS:
             if word in h:
                 self.header = "STOP PROCESS"
-                self._log.debug("MPFProcess {} has received a terminate command!".format(self._pid))
+                self._log.debug("MPFProcess {} has received a terminate command!".format(self._name))
                 return

@@ -18,7 +18,7 @@ class ExampleProcess(MPFProcess):
 
     def init(self):
         #Pull out 5 entries from our memory.
-        self._data = self._shared_memory.get(0, 5)
+        self._data = self.shared_memory.get(0, 5)
 
     def update(self, header, data):
         #We aren't going to be accepting messages from the main process in this example.

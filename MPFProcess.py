@@ -10,13 +10,15 @@
 """
 
 from multiprocessing import Process
+import traceback
 class MPFProcess(Process):
-    def __init__(self, loop_wait_period=None):
+    def __init__(self, process_name = "unnamed_process", loop_wait_period=None):
         Process.__init__(self)
         self._out = None
         self._inp = None
         self._loop_wait_period = loop_wait_period
-        self._shared_memory = None
+        self.name = process_name
+        self.shared_memory = None
         self.task_checker = None
         self.results_publisher = None
         self._log = None
@@ -36,15 +38,15 @@ class MPFProcess(Process):
             import time
 
             #This are our i/o objects for interfacing with the main process.
-            self.task_checker = MPFTaskChecker(self._inp, self.pid)
-            self.results_publisher = MPFResultPublisher(self._out, self.pid)
+            self.task_checker = MPFTaskChecker(self._inp, self.name)
+            self.results_publisher = MPFResultPublisher(self._out, self.name)
 
             self._log = logging.getLogger("MPFLogger")
             self._log.debug("MPFProcess initializing...")
 
             #Initialize.
             self.init()
-            self._log.debug("MPFProcess {} has successfully initialized".format(self.pid))
+            self._log.debug("MPFProcess {} has successfully initialized".format(self.name))
 
             while True:
                 #Here is the simple loop to be executed by this process until termination.
@@ -54,7 +56,7 @@ class MPFProcess(Process):
 
                     #If we are told to stop running, do so.
                     if self.task_checker.header == "STOP PROCESS":
-                        self._log.debug("PROCESS {} RECEIVED STOP SIGNAL!".format(self.pid))
+                        self._log.debug("PROCESS {} RECEIVED STOP SIGNAL!".format(self.name))
                         break
 
                     #Otherwise, update with the latest main process message.
@@ -70,29 +72,32 @@ class MPFProcess(Process):
                 if self._loop_wait_period is not None:
                     time.sleep(self._loop_wait_period)
 
-        except Exception as e:
+        except:
             #Catch-all because I'm lazy.
-            self._log.critical("MPFPROCESS {} HAS CRASHED!\nEXCEPTION:\n{}\n{}".format(self.pid, type(e),e.args))
+            error = traceback.format_exc()
+            self._log.critical("MPFPROCESS {} HAS CRASHED!\n"
+                               "EXCEPTION TRACEBACK:\n"
+                               "{}".format(self.name, error))
 
         finally:
             #Clean everything up and terminate.
             if self.task_checker is not None:
-                self._log.debug("MPFProcess {} Cleaning task checker...".format(self.pid))
+                self._log.debug("MPFProcess {} Cleaning task checker...".format(self.name))
                 self.task_checker.cleanup()
                 del self.task_checker
-                self._log.debug("MPFProcess {} has cleaned its task checker!".format(self.pid))
+                self._log.debug("MPFProcess {} has cleaned its task checker!".format(self.name))
 
             if self.results_publisher is not None:
                 del self.results_publisher
 
-            self._log.debug("MPFProcess {} Cleaning up...".format(self.pid))
+            self._log.debug("MPFProcess {} Cleaning up...".format(self.name))
             self.cleanup()
 
-            self._log.debug("MPFProcess {} Exiting!".format(self.pid))
+            self._log.debug("MPFProcess {} Exiting!".format(self.name))
             return
 
     def set_shared_memory(self, memory):
-        self._shared_memory = memory
+        self.shared_memory = memory
 
     def init(self):
         raise NotImplementedError
