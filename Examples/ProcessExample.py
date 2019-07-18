@@ -11,7 +11,7 @@ import time
 class ExampleProcess(MPFProcess):
     def __init__(self):
         #We set loop wait period to 1 here to pretend the process is doing something intensive.
-        super().__init__(process_name="example process", loop_wait_period=1)
+        super().__init__(process_name="example_process", loop_wait_period=1)
         self._data = None
 
     def init(self):

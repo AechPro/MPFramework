@@ -27,7 +27,7 @@ class MPFSharedMemory(object):
         self._size = size
         self._manager = None
         self._memory = None
-        self._log = logging.getLogger("MPFLogger")
+        self._MPFLog = logging.getLogger("MPFLogger")
         self._allocate()
 
     def fill_memory(self, data):
@@ -44,7 +44,7 @@ class MPFSharedMemory(object):
         :return: None.
         """
 
-        self._log.debug("Allocating MPFMemoryBlock!\nSize: {}\nData type: {}.".format(self._size, self.dtype))
+        self._MPFLog.debug("Allocating MPFMemoryBlock!\nSize: {}\nData type: {}.".format(self._size, self.dtype))
 
         #Register our shared memory block and start the manager object.
         BaseManager.register('MPFSharedMemoryBlock', MPFSharedMemoryBlock)
@@ -53,21 +53,21 @@ class MPFSharedMemory(object):
 
         #Build our memory object through the manager object.
         self._memory = self._manager.MPFSharedMemoryBlock(self._size, self.dtype)
-        self._log.debug("MPFMemoryBlock allocated successfully!")
+        self._MPFLog.debug("MPFMemoryBlock allocated successfully!")
 
 
     def cleanup(self):
         try:
-            self._log.debug("Cleaning up MPFMemoryBlock...")
+            self._MPFLog.debug("Cleaning up MPFMemoryBlock...")
 
             self._memory.cleanup()
-            self._log.debug("Shutting down MPFMemory manager...")
+            self._MPFLog.debug("Shutting down MPFMemory manager...")
 
             self._manager.shutdown()
-            self._log.debug("MPFMemoryBlock has closed successfully!")
+            self._MPFLog.debug("MPFMemoryBlock has closed successfully!")
 
         except Exception as e:
-            self._log.debug("MPFMemoryBlock was unable to close!"
+            self._MPFLog.debug("MPFMemoryBlock was unable to close!"
                             "\nException type: {}\nException args:".format(type(e), e.args))
         finally:
             del self._memory

@@ -13,7 +13,7 @@ class MPFResultPublisher(object):
     def __init__(self, output_queue, name):
         self._output_queue = output_queue
         self._name = name
-        self._log = logging.getLogger("MPFLogger")
+        self._MPFLog = logging.getLogger("MPFLogger")
 
     def publish(self, data, header="MPFProcess_default_header", block=True, timeout = 1.0):
         """
@@ -28,10 +28,10 @@ class MPFResultPublisher(object):
         if not self._output_queue.full():
             data_packet = MPFDataPacket(header, data)
             self._output_queue.put(data_packet, block=block, timeout=timeout)
-            self._log.debug("MPFProcess {} successfully published data!")
+            self._MPFLog.debug("MPFProcess {} successfully published data!")
             del data_packet
         else:
-            self._log.debug("Unable to publish results, MPFProcess {} output queue is full!".format(self._name))
+            self._MPFLog.debug("Unable to publish results, MPFProcess {} output queue is full!".format(self._name))
             time.sleep(timeout)
 
         del data

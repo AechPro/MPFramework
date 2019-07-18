@@ -10,6 +10,8 @@ from MPFramework import MPFDataPacket, MPFTaskChecker
 import multiprocessing as mp
 import logging
 import time
+import traceback
+from queue import Empty
 
 try:
     #We want true asynchronicity with as little task switching as possible.
@@ -26,7 +28,7 @@ class MPFProcessHandler(object):
     def __init__(self, inputQueue=None, input_queue_max_size=1000, output_queue_max_size=1000):
         self._output_queue = mp.Queue(maxsize = output_queue_max_size)
         self._process = None
-        self._log = logging.getLogger("MPFLogger")
+        self._MPFLog = logging.getLogger("MPFLogger")
         self._terminating = False
 
         if inputQueue is None:
@@ -44,7 +46,7 @@ class MPFProcessHandler(object):
 
         import sys
         import os
-        self._log.debug("Setting up a new MPFProcess...")
+        self._MPFLog.debug("Setting up a new MPFProcess...")
         self._process = process
 
         #Setup process i/o and start it.
@@ -55,10 +57,10 @@ class MPFProcessHandler(object):
 
         #If a specific cpu core is requested and the os is linux, move the process to that core.
         if "linux" in sys.platform and cpu_num is not None:
-            self._log.debug("Moving MPFProcess {} to CPU core {}.".format(process.name, cpu_num))
+            self._MPFLog.debug("Moving MPFProcess {} to CPU core {}.".format(process.name, cpu_num))
             os.system("taskset -p -c {} {}".format(cpu_num, process.pid))
 
-        self._log.debug("MPFProcess {} has started!".format(process.name))
+        self._MPFLog.debug("MPFProcess {} has started!".format(process.name))
 
     def put(self, header, data, delay=None, block=False, timeout=None):
         """
@@ -80,7 +82,7 @@ class MPFProcessHandler(object):
             self._input_queue.put(task, block=block, timeout=timeout)
             del task
         else:
-            self._log.debug("MPFProcess {} input queue is full!".format(self._process.name))
+            self._MPFLog.debug("MPFProcess {} input queue is full!".format(self._process.name))
 
         if delay is not None:
             time.sleep(delay)
@@ -127,18 +129,22 @@ class MPFProcessHandler(object):
         try:
             #Here we take items off the queue for as long as the qsize function says we can.
             while self._output_queue.qsize() > 0:
-                result = self._output_queue.get(block=block, timeout=timeout)
+                try:
+                    result = self._output_queue.get(block=block, timeout=timeout)
 
-                header, data = result()
-                results.append((header, data))
-                result.cleanup()
+                    header, data = result()
+                    results.append((header, data))
+                    result.cleanup()
 
-                del result
-        except:
-            #There are cases when qsize() will claim to be greater than zero, but will be wrong.
-            #We want to catch those cases and ignore them.
-            pass
-
+                    del result
+                except Empty:
+                    #It appears to be the case that the empty flag in the queue object
+                    #is not related to the qsize() function, so an empty queue exception can
+                    #be thrown even when the queue is not actually empty.
+                    continue
+        except Exception:
+            error = traceback.format_exc()
+            self._MPFLog.critical("GET_ALL ERROR!\n{}".format(error))
         finally:
             return results
 
@@ -160,19 +166,19 @@ class MPFProcessHandler(object):
         self._terminating = True
 
         #Put an exit command on the input queue to our process.
-        self._log.debug("Sending terminate command to process {}.".format(self._process.name))
+        self._MPFLog.debug("Sending terminate command to process {}.".format(self._process.name))
         task = MPFDataPacket(MPFTaskChecker.EXIT_KEYWORDS[0], self._process.name)
         self._input_queue.put(task)
 
         #Terminate and join the process.
         #self._process.terminate()
         self._process.join()
-        self._log.debug("Successfully terminated MPFProcess {}!".format(self._process.name))
+        self._MPFLog.debug("Successfully terminated MPFProcess {}!".format(self._process.name))
 
         #Get any residual items from the output queue and delete them.
         residual_output = self.get_all(cleaning_up=True)
         if residual_output is not None:
-            self._log.debug("Removed {} residual outputs from queue.".format(len(residual_output)))
+            self._MPFLog.debug("Removed {} residual outputs from queue.".format(len(residual_output)))
             del residual_output
 
         #Note here that we do not join either the input or output queues.
@@ -198,7 +204,7 @@ class MPFProcessHandler(object):
             return True
 
         if not self.is_alive():
-            self._log.critical("Detected failure in MPFProcess {}! Terminating...".format(self._process.name))
+            self._MPFLog.critical("Detected failure in MPFProcess {}! Terminating...".format(self._process.name))
             self.close()
             return True
         return False

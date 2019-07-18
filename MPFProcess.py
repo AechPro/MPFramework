@@ -21,7 +21,7 @@ class MPFProcess(Process):
         self.shared_memory = None
         self.task_checker = None
         self.results_publisher = None
-        self._log = None
+        self._MPFLog = None
 
     def run(self):
         """
@@ -41,12 +41,12 @@ class MPFProcess(Process):
             self.task_checker = MPFTaskChecker(self._inp, self.name)
             self.results_publisher = MPFResultPublisher(self._out, self.name)
 
-            self._log = logging.getLogger("MPFLogger")
-            self._log.debug("MPFProcess initializing...")
+            self._MPFLog = logging.getLogger("MPFLogger")
+            self._MPFLog.debug("MPFProcess initializing...")
 
             #Initialize.
             self.init()
-            self._log.debug("MPFProcess {} has successfully initialized".format(self.name))
+            self._MPFLog.debug("MPFProcess {} has successfully initialized".format(self.name))
 
             while True:
                 #Here is the simple loop to be executed by this process until termination.
@@ -56,7 +56,7 @@ class MPFProcess(Process):
 
                     #If we are told to stop running, do so.
                     if self.task_checker.header == "STOP PROCESS":
-                        self._log.debug("PROCESS {} RECEIVED STOP SIGNAL!".format(self.name))
+                        self._MPFLog.debug("PROCESS {} RECEIVED STOP SIGNAL!".format(self.name))
                         break
 
                     #Otherwise, update with the latest main process message.
@@ -75,25 +75,25 @@ class MPFProcess(Process):
         except:
             #Catch-all because I'm lazy.
             error = traceback.format_exc()
-            self._log.critical("MPFPROCESS {} HAS CRASHED!\n"
+            self._MPFLog.critical("MPFPROCESS {} HAS CRASHED!\n"
                                "EXCEPTION TRACEBACK:\n"
                                "{}".format(self.name, error))
 
         finally:
             #Clean everything up and terminate.
             if self.task_checker is not None:
-                self._log.debug("MPFProcess {} Cleaning task checker...".format(self.name))
+                self._MPFLog.debug("MPFProcess {} Cleaning task checker...".format(self.name))
                 self.task_checker.cleanup()
                 del self.task_checker
-                self._log.debug("MPFProcess {} has cleaned its task checker!".format(self.name))
+                self._MPFLog.debug("MPFProcess {} has cleaned its task checker!".format(self.name))
 
             if self.results_publisher is not None:
                 del self.results_publisher
 
-            self._log.debug("MPFProcess {} Cleaning up...".format(self.name))
+            self._MPFLog.debug("MPFProcess {} Cleaning up...".format(self.name))
             self.cleanup()
 
-            self._log.debug("MPFProcess {} Exiting!".format(self.name))
+            self._MPFLog.debug("MPFProcess {} Exiting!".format(self.name))
             return
 
     def set_shared_memory(self, memory):

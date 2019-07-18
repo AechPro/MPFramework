@@ -24,7 +24,7 @@ class MPFTaskChecker(object):
         self._init_sleep_period = init_sleep_period
         self._name = name
         self._joinable = type(input_queue) == type(JoinableQueue())
-        self._log = logging.getLogger("MPFLogger")
+        self._MPFLog = logging.getLogger("MPFLogger")
 
     def wait_for_initialization(self, header=None):
         """
@@ -34,11 +34,11 @@ class MPFTaskChecker(object):
         :return: None.
         """
 
-        self._log.debug("MPFProcess {} is waiting for initialization...".format(self._name))
+        self._MPFLog.debug("MPFProcess {} is waiting for initialization...".format(self._name))
         #In some cases we might have already received some data by the time this function is called. This checks for that.
         if header is not None and self.header is not None:
             if self.header == header:
-                self._log.debug("MPFProcess {} has initialized!".format(self._name))
+                self._MPFLog.debug("MPFProcess {} has initialized!".format(self._name))
                 return
 
 
@@ -57,7 +57,7 @@ class MPFTaskChecker(object):
             #Wait to avoid CPU stress.
             time.sleep(self._init_sleep_period)
 
-        self._log.debug("MPFProcess {} has initialized!".format(self._name))
+        self._MPFLog.debug("MPFProcess {} has initialized!".format(self._name))
 
     def check_for_update(self):
         """
@@ -73,7 +73,7 @@ class MPFTaskChecker(object):
             #Get the next data packet, should be MPFDataPacket object.
             data_packet = self._input_queue.get_nowait()
             header, data = data_packet()
-            self._log.debug("MPFProcess {} has received a new data packet!".format(self._name))
+            self._MPFLog.debug("MPFProcess {} has received a new data packet!".format(self._name))
 
             #Update our current data object and header.
             self._update_data(data)
@@ -116,5 +116,5 @@ class MPFTaskChecker(object):
         for word in self.EXIT_KEYWORDS:
             if word in h:
                 self.header = "STOP PROCESS"
-                self._log.debug("MPFProcess {} has received a terminate command!".format(self._name))
+                self._MPFLog.debug("MPFProcess {} has received a terminate command!".format(self._name))
                 return
