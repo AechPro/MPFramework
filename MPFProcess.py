@@ -9,10 +9,15 @@
         objects will get.
 """
 
-from multiprocessing import Process
+import sys
 import traceback
+from multiprocessing import Process
+
+
 class MPFProcess(Process):
-    def __init__(self, process_name = "unnamed_process", loop_wait_period=None):
+    STOP_KEYWORD = "STOP MPF PROCESS"
+
+    def __init__(self, process_name = "unnamed_mpf_process", loop_wait_period=None):
         Process.__init__(self)
         self._out = None
         self._inp = None
@@ -22,6 +27,7 @@ class MPFProcess(Process):
         self.task_checker = None
         self.results_publisher = None
         self._MPFLog = None
+        self._successful_termination = False
 
     def run(self):
         """
@@ -53,13 +59,16 @@ class MPFProcess(Process):
 
                 #Check for new inputs from the main process.
                 if self.task_checker.check_for_update():
+                    self._MPFLog.debug("Process {} got update {}".format(self.name, self.task_checker.header))
 
                     #If we are told to stop running, do so.
-                    if self.task_checker.header == "STOP PROCESS":
+                    if self.task_checker.header == MPFProcess.STOP_KEYWORD:
                         self._MPFLog.debug("PROCESS {} RECEIVED STOP SIGNAL!".format(self.name))
-                        break
+                        self._successful_termination = True
+                        raise sys.exit(0)
 
                     #Otherwise, update with the latest main process message.
+                    self._MPFLog.debug("Process {} sending update to subclass".format(self.name))
                     self.update(self.task_checker.header, self.task_checker.latest_data)
 
                 #Take a step.
@@ -75,7 +84,8 @@ class MPFProcess(Process):
         except:
             #Catch-all because I'm lazy.
             error = traceback.format_exc()
-            self._MPFLog.critical("MPFPROCESS {} HAS CRASHED!\n"
+            if not self._successful_termination:
+                self._MPFLog.critical("MPFPROCESS {} HAS CRASHED!\n"
                                "EXCEPTION TRACEBACK:\n"
                                "{}".format(self.name, error))
 

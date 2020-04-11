@@ -9,12 +9,15 @@
         simply check the latest_data and header variables inside the MPFTaskChecker object.
 """
 
-from multiprocessing import JoinableQueue
 import logging
 import time
+from multiprocessing import JoinableQueue
+from queue import Empty
+from MPFramework import MPFProcess
+
 
 class MPFTaskChecker(object):
-    EXIT_KEYWORDS = ["terminate", "terminal", "exit", "stop", "join", "close", "finish"]
+    EXIT_KEYWORDS = ["mpf_terminate", "mpf_terminal", "mpf_exit", "mpf_stop", "mpf_join", "mpf_close", "mpf_finish"]
 
     def __init__(self, input_queue, name, update_check_sleep_period=0.1, init_sleep_period=1.0):
         self.latest_data = None
@@ -68,6 +71,7 @@ class MPFTaskChecker(object):
         """
 
         newData = False
+
         if not self._input_queue.empty():
 
             #Get the next data packet, should be MPFDataPacket object.
@@ -94,27 +98,60 @@ class MPFTaskChecker(object):
         return newData
 
     def _update_data(self, data):
-        self.cleanup()
-        self.latest_data = data
-        del data
-
-    def cleanup(self):
         try:
             self.latest_data.clear()
         except:
             pass
         finally:
             del self.latest_data
+            self.latest_data = data
+            del data
+
+    def cleanup(self):
+        try:
+            self.latest_data.clear()
+
+            results = []
+            try:
+                fail_count = 0
+                # This is a copy and paste of get_all() from MPFProcessHandler.
+                while self._input_queue.qsize() > 0:
+                    try:
+                        result = self._input_queue.get(block=True, timeout=0.1)
+
+                        header, data = result()
+                        results.append((header, data))
+                        result.cleanup()
+
+                        del result
+                        fail_count = 0
+                    except Empty:
+                        fail_count += 1
+                        if fail_count >= 10:
+                            break
+                        else:
+                            continue
+            except Exception:
+                import traceback
+                error = traceback.format_exc()
+                self._MPFLog.critical("GET_ALL ERROR FROM {} MPF TASK CHECKER!\n{}".format(self._name, error))
+            finally:
+                del results
+        except:
+            pass
+        finally:
+            del self.latest_data
+            self.latest_data = None
 
     def _check_for_terminal_message(self, header, data):
         #Check to make sure this message is for us.
-        if data != self._name:
+        if type(data) == str and data != self._name:
             return
 
         #Check to see if this message contains a terminate header.
         h = header.lower().strip()
         for word in self.EXIT_KEYWORDS:
             if word in h:
-                self.header = "STOP PROCESS"
+                self.header = MPFProcess.MPFProcess.STOP_KEYWORD
                 self._MPFLog.debug("MPFProcess {} has received a terminate command!".format(self._name))
                 return

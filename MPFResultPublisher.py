@@ -5,9 +5,11 @@
     Description:
         This is a container for the output queue used by an MPFProcess object. It handles putting data on the queue.
 """
-from MPFramework import MPFDataPacket
 import logging
 import time
+
+from MPFramework import MPFDataPacket
+
 
 class MPFResultPublisher(object):
     def __init__(self, output_queue, name):
@@ -28,7 +30,7 @@ class MPFResultPublisher(object):
         if not self._output_queue.full():
             data_packet = MPFDataPacket(header, data)
             self._output_queue.put(data_packet, block=block, timeout=timeout)
-            self._MPFLog.debug("MPFProcess {} successfully published data!")
+            #self._MPFLog.debug("MPFProcess {} successfully published data!")
             del data_packet
         else:
             self._MPFLog.debug("Unable to publish results, MPFProcess {} output queue is full!".format(self._name))

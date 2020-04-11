@@ -7,9 +7,13 @@
         Any number of processes can access the same block of memory used in this example.
 """
 
-from MPFramework import MPFProcess, MPFProcessHandler, MPFSharedMemory
 import time
+
 import numpy as np
+
+from MPFramework import MPFProcess, MPFProcessHandler, MPFSharedMemory
+
+
 class ExampleProcess(MPFProcess):
     def __init__(self):
         #We set loop wait period to 1 here to pretend the process is doing something intensive.

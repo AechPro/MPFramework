@@ -6,8 +6,11 @@
         This file contains an example for how to create a MPFProcess object and interface with it from
         the main process.
 """
-from MPFramework import MPFProcess, MPFProcessHandler
 import time
+
+from MPFramework import MPFProcess, MPFProcessHandler
+
+
 class ExampleProcess(MPFProcess):
     def __init__(self):
         #We set loop wait period to 1 here to pretend the process is doing something intensive.

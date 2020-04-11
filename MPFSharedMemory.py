@@ -9,11 +9,13 @@
         could result in huge memory usage spikes. Safe asynchronous usage is left to the user.
 """
 
-from multiprocessing.managers import BaseManager
-import multiprocessing as mp
-import numpy as np
-import logging
 import ctypes
+import logging
+import multiprocessing as mp
+from multiprocessing.managers import BaseManager
+
+import numpy as np
+
 
 class MPFSharedMemory(object):
     #Supported memory types.
@@ -22,8 +24,9 @@ class MPFSharedMemory(object):
     MPF_INT32 = ctypes.c_int32
     MPF_INT64 = ctypes.c_int64
 
-    def __init__(self, size, dtype=MPF_FLOAT32):
+    def __init__(self, size, rng=None, dtype=MPF_FLOAT32):
         self.dtype = dtype
+        self.rng=rng
         self._size = size
         self._manager = None
         self._memory = None
@@ -35,6 +38,18 @@ class MPFSharedMemory(object):
 
     def get_memory(self):
         return self._memory
+
+
+    #Begin memory access wrappers
+    def get(self, index, size):
+        return self._memory.get(index, size)
+
+    def get_random(self, size):
+        return self._memory.get_random(size)
+
+    def get_size(self):
+        return self._size
+    #End memory access wrappers
 
     def _allocate(self):
         """
@@ -52,9 +67,8 @@ class MPFSharedMemory(object):
         self._manager.start()
 
         #Build our memory object through the manager object.
-        self._memory = self._manager.MPFSharedMemoryBlock(self._size, self.dtype)
+        self._memory = self._manager.MPFSharedMemoryBlock(self._size, self.dtype, rng=self.rng)
         self._MPFLog.debug("MPFMemoryBlock allocated successfully!")
-
 
     def cleanup(self):
         try:
@@ -70,16 +84,26 @@ class MPFSharedMemory(object):
             self._MPFLog.debug("MPFMemoryBlock was unable to close!"
                             "\nException type: {}\nException args:".format(type(e), e.args))
         finally:
-            del self._memory
-            del self._manager
+            if self._memory is not None:
+                del self._memory
+
+            if self._manager is not None:
+                del self._manager
+
+            if self.rng is not None:
+                del self.rng
+
+            self._memory = None
+            self._manager = None
+            self.rng = None
 
 class MPFSharedMemoryBlock(object):
-    def __init__(self, mem_size, dtype):
+    def __init__(self, mem_size, dtype, rng=None):
         self._dtype = self._parse_dtype(dtype)
         self._mem_size = mem_size
+        self._rng = rng
         self._mem = None
         self._shared_block = None
-        self._manager = None
 
         self._allocate()
 
@@ -102,6 +126,13 @@ class MPFSharedMemoryBlock(object):
 
         data = self._mem[index:index + size]
         return data
+
+    def get_random(self, size):
+        if self._rng is None:
+            return None
+
+        idx = self._rng.randint(0, self._mem_size - size)
+        return idx, self.get(idx, size)
 
     def get_size(self):
         return self._mem_size
@@ -132,7 +163,7 @@ class MPFSharedMemoryBlock(object):
         if code in longCodes:
             return MPFSharedMemory.MPF_INT64
 
-        return MPFSharedMemory.MPF_FLOAT32
+        raise NameError
 
     def _allocate(self):
         """
@@ -151,3 +182,6 @@ class MPFSharedMemoryBlock(object):
 
         del self._shared_block
         self._shared_block = None
+
+        del self._rng
+        self._rng = None

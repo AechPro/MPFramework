@@ -6,12 +6,13 @@
         This is the container for an MPFProcess object. It handles spawning the process and interfacing with it
         from the main process.
 """
-from MPFramework import MPFDataPacket, MPFTaskChecker
-import multiprocessing as mp
 import logging
+import multiprocessing as mp
 import time
 import traceback
 from queue import Empty
+
+from MPFramework import MPFDataPacket, MPFTaskChecker
 
 try:
     #We want true asynchronicity with as little task switching as possible.
@@ -105,7 +106,7 @@ class MPFProcessHandler(object):
 
         return None
 
-    def get_all(self, block=False, timeout=None, cleaning_up=False):
+    def get_all(self, block=False, timeout=None, failure_sleep_period_ms=0.1, cleaning_up=False):
         """
         Function to get every item currently available on the output queue from our process. The implementation of
         this function looks a bit odd, but it has been my experience that simply checking if a queue is empty almost never
@@ -125,9 +126,11 @@ class MPFProcessHandler(object):
         if self._output_queue.empty():
             return None
 
+        failCount = 0
+
         results = []
         try:
-            #Here we take items off the queue for as long as the qsize function says we can.
+            # Here we take items off the queue for as long as the qsize function says we can.
             while self._output_queue.qsize() > 0:
                 try:
                     result = self._output_queue.get(block=block, timeout=timeout)
@@ -137,11 +140,33 @@ class MPFProcessHandler(object):
                     result.cleanup()
 
                     del result
+                    failCount = 0
                 except Empty:
-                    #It appears to be the case that the empty flag in the queue object
-                    #is not related to the qsize() function, so an empty queue exception can
-                    #be thrown even when the queue is not actually empty.
-                    continue
+                    failCount += 1
+                    if failure_sleep_period_ms is not None and failure_sleep_period_ms > 0:
+                        time.sleep(failure_sleep_period_ms)
+
+                    # It appears to be the case that the empty flag in the queue object
+                    # is not related to the qsize() function, so an empty queue exception can
+                    # be thrown even when the queue is not actually empty.
+
+                    # This code can infinitely loop for some reason. qsize() can return a valid integer,
+                    # while empty() can return true for an unlimited period of time, causing get to fail indefinitely.
+                    # Whatever data remains in the queue simply cannot be
+                    # retrieved at this point, and it is left in memory until the Python interpreter is closed.
+                    if failCount >= 10:
+                        if self._input_queue.qsize() == 0 and self._input_queue.empty():
+                            break
+
+                        self._MPFLog.critical("GET_ALL FAILURE LIMIT REACHED ERROR!\n"
+                                              "FAILURE COUNT: {}\n"
+                                              "REMAINING QSIZE: {}\n"
+                                              "QUEUE EMPTY STATUS: {}".format(failCount,
+                                                                              self._input_queue.qsize(),
+                                                                              self._input_queue.empty()))
+                        break
+                    else:
+                        continue
         except Exception:
             error = traceback.format_exc()
             self._MPFLog.critical("GET_ALL ERROR!\n{}".format(error))
@@ -166,16 +191,14 @@ class MPFProcessHandler(object):
         self._terminating = True
 
         #Put an exit command on the input queue to our process.
-        self._MPFLog.debug("Sending terminate command to process {}.".format(self._process.name))
-        task = MPFDataPacket(MPFTaskChecker.EXIT_KEYWORDS[0], self._process.name)
-        self._input_queue.put(task)
+        self._MPFLog.debug("Beginning process termination...")
 
-        #Terminate and join the process.
-        #self._process.terminate()
-        self._process.join()
+        self._terminate_process()
+
         self._MPFLog.debug("Successfully terminated MPFProcess {}!".format(self._process.name))
 
         #Get any residual items from the output queue and delete them.
+        self._MPFLog.debug("Beginning residual output collection...")
         residual_output = self.get_all(cleaning_up=True)
         if residual_output is not None:
             self._MPFLog.debug("Removed {} residual outputs from queue.".format(len(residual_output)))
@@ -188,6 +211,7 @@ class MPFProcessHandler(object):
         del self._input_queue
         del self._output_queue
         del self._process
+        self._MPFLog.debug("All MPFProcess objects have been terminated!")
 
     def join(self):
         self.close()
@@ -208,3 +232,12 @@ class MPFProcessHandler(object):
             self.close()
             return True
         return False
+
+    def _terminate_process(self):
+        self._MPFLog.debug("Sending terminate command to process {}.".format(self._process.name))
+        task = MPFDataPacket(MPFTaskChecker.EXIT_KEYWORDS[0], self._process.name)
+        self._input_queue.put(task)
+        self._process.join(timeout=5)
+        while self.is_alive():
+            self._process.terminate()
+            self._process.join(timeout=5)
