@@ -26,14 +26,16 @@ except: #Yeah yeah yeah, I shouldn't use catch-alls for exception handling. Bite
 
 
 class MPFProcessHandler(object):
-    def __init__(self, inputQueue=None, input_queue_max_size=1000, output_queue_max_size=1000):
+    def __init__(self, input_queue=None, input_queue_max_size=1000, output_queue_max_size=1000):
         self._output_queue = mp.Queue(maxsize = output_queue_max_size)
         self._process = None
         self._MPFLog = logging.getLogger("MPFLogger")
         self._terminating = False
 
-        if inputQueue is None:
+        if input_queue is None:
             self._input_queue = mp.Queue(maxsize = input_queue_max_size)
+        else:
+            self._input_queue = input_queue
 
     def setup_process(self, process, shared_memory = None, cpu_num = None):
         """
