@@ -93,17 +93,21 @@ class MPFProcessHandler(object):
         del header
         del data
 
-    def get(self):
+    def get(self, block=False, timeout=None):
         """
         Function to get one item from our process' output queue.
         :return: Item from our process if there was one, None otherwise.
         """
 
-        if self._check_status():
+        if self._check_status() and not cleaning_up:
+            return None
+
+        #First, check if the queue is empty and return if it is.
+        if self._output_queue.empty():
             return None
 
         if not self._output_queue.empty():
-            data_packet = self._output_queue.get()
+            data_packet = self._output_queue.get(block=block, timeout=timeout)
             return data_packet()
 
         return None
