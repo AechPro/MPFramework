@@ -36,7 +36,7 @@ class MPFProcess(Process):
         """
 
         try:
-            #We import everything important here to ensure that the libraries we need will be imported into the new
+            #We import everything necessary here to ensure that the libraries we need will be imported into the new
             #process memory instead of the main process memory.
             from MPFramework import MPFResultPublisher
             from MPFramework import MPFTaskChecker
@@ -59,16 +59,16 @@ class MPFProcess(Process):
 
                 #Check for new inputs from the main process.
                 if self.task_checker.check_for_update():
-                    self._MPFLog.debug("Process {} got update {}".format(self.name, self.task_checker.header))
+                    self._MPFLog.debug("MPFProcess {} got update {}".format(self.name, self.task_checker.header))
 
                     #If we are told to stop running, do so.
                     if self.task_checker.header == MPFProcess.STOP_KEYWORD:
-                        self._MPFLog.debug("PROCESS {} RECEIVED STOP SIGNAL!".format(self.name))
+                        self._MPFLog.debug("MPFPROCESS {} RECEIVED STOP SIGNAL!".format(self.name))
                         self._successful_termination = True
                         raise sys.exit(0)
 
                     #Otherwise, update with the latest main process message.
-                    self._MPFLog.debug("Process {} sending update to subclass".format(self.name))
+                    self._MPFLog.debug("MPFProcess {} sending update to subclass".format(self.name))
                     self.update(self.task_checker.header, self.task_checker.latest_data)
 
                 #Take a step.
@@ -78,7 +78,7 @@ class MPFProcess(Process):
                 self.publish()
 
                 #Wait if requested.
-                if self._loop_wait_period is not None:
+                if self._loop_wait_period is not None and self._loop_wait_period > 0:
                     time.sleep(self._loop_wait_period)
 
         except:

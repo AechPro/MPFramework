@@ -66,7 +66,7 @@ class MPFSharedMemory(object):
         self._manager = BaseManager()
         self._manager.start()
 
-        #Build our memory object through the manager object.
+        #Build our memory object through the manager.
         self._memory = self._manager.MPFSharedMemoryBlock(self._size, self.dtype, rng=self.rng)
         self._MPFLog.debug("MPFMemoryBlock allocated successfully!")
 
@@ -80,9 +80,10 @@ class MPFSharedMemory(object):
             self._manager.shutdown()
             self._MPFLog.debug("MPFMemoryBlock has closed successfully!")
 
-        except Exception as e:
-            self._MPFLog.debug("MPFMemoryBlock was unable to close!"
-                            "\nException type: {}\nException args:".format(type(e), e.args))
+        except:
+            import traceback
+            self._MPFLog.critical("MPFMemoryBlock was unable to close!"
+                                  "\nException traceback: {}".format(traceback.format_exc()))
         finally:
             if self._memory is not None:
                 del self._memory
@@ -120,12 +121,11 @@ class MPFSharedMemoryBlock(object):
         """
         Function to read from our memory block.
         :param index: Index at which to start reading.
-        :param size: Size of the data to read.
+        :param size: Number of indices to read.
         :return: Memory from index to index+size
         """
 
-        data = self._mem[index:index + size]
-        return data
+        return self._mem[index:index + size]
 
     def get_random(self, size):
         if self._rng is None:
@@ -146,21 +146,21 @@ class MPFSharedMemoryBlock(object):
 
         code = code
 
-        floatCodes = ('float', 'float32', np.float32, 'f', ctypes.c_float)
-        doubleCodes = ('double', 'float64', np.float64, 'd', ctypes.c_double)
-        intCodes = ('int', 'int32', np.int32, 'i', ctypes.c_int32)
-        longCodes = ('long', 'int64', np.int64, 'l', ctypes.c_int64)
+        float_codes = ('float', 'float32', np.float32, 'f', ctypes.c_float)
+        double_codes = ('double', 'float64', np.float64, 'd', ctypes.c_double)
+        int_codes = ('int', 'int32', np.int32, 'i', ctypes.c_int32)
+        long_codes = ('long', 'int64', np.int64, 'l', ctypes.c_int64)
 
-        if code in floatCodes:
+        if code in float_codes:
             return MPFSharedMemory.MPF_FLOAT32
 
-        if code in doubleCodes:
+        if code in double_codes:
             return MPFSharedMemory.MPF_FLOAT64
 
-        if code in intCodes:
+        if code in int_codes:
             return MPFSharedMemory.MPF_INT32
 
-        if code in longCodes:
+        if code in long_codes:
             return MPFSharedMemory.MPF_INT64
 
         raise NameError
@@ -170,7 +170,7 @@ class MPFSharedMemoryBlock(object):
         Private function to allocate the shared memory.
         :return: None.
         """
-        #We use a RawArray because we don't want to deal with multiprocessing thread-safe nonsense.
+        #We use a RawArray because we don't want to deal with any multiprocessing thread-safe nonsense.
         self._shared_block = mp.RawArray(self._dtype, self._mem_size)
 
         #Here we're loading the shared block into a numpy array so we can use it with little hassle.

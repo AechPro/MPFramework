@@ -11,6 +11,7 @@ import multiprocessing as mp
 import time
 import traceback
 from queue import Empty
+import psutil
 
 from MPFramework import MPFDataPacket, MPFTaskChecker
 
@@ -46,9 +47,6 @@ class MPFProcessHandler(object):
         :param cpu_num: The CPU core to spawn the process on. Only available on Linux.
         :return: None.
         """
-
-        import sys
-        import os
         self._MPFLog.debug("Setting up a new MPFProcess...")
         self._process = process
 
@@ -58,10 +56,12 @@ class MPFProcessHandler(object):
         process.set_shared_memory(shared_memory)
         process.start()
 
-        #If a specific cpu core is requested and the os is linux, move the process to that core.
-        if "linux" in sys.platform and cpu_num is not None:
+        #If a specific cpu core is requested, move the process to that core.
+        if cpu_num is not None:
             self._MPFLog.debug("Moving MPFProcess {} to CPU core {}.".format(process.name, cpu_num))
-            os.system("taskset -p -c {} {}".format(cpu_num, process.pid))
+            if type(cpu_num) not in (list, tuple):
+                cpu_num = [cpu_num]
+            psutil.Process(process.pid).cpu_affinity(cpu_num)
 
         self._MPFLog.debug("MPFProcess {} has started!".format(process.name))
 
@@ -107,8 +107,8 @@ class MPFProcessHandler(object):
             return None
 
         if not self._output_queue.empty():
-            data_packet = self._output_queue.get(block=block, timeout=timeout)
-            return data_packet()
+            result = self._output_queue.get(block=block, timeout=timeout)
+            return result()
 
         return None
 
